@@ -21,22 +21,17 @@ let rec gameloop world =
 
     let world = match action with
                 | Action.Movement(dir) -> 
-                    { world with hero = tryMove world.hero dir world.currentLevel }
+                    match tryBumpAction world dir with
+                    | Some(newWorld) -> newWorld
+                    | None ->
+                        match tryMove world.hero dir world.currentLevel with
+                        | Some(newCoords) -> { world with hero = newCoords }
+                        | None -> world
                 | Action.Exit -> { world with shouldExit = true }
-                | _ -> world
 
     if not world.shouldExit
         then gameloop world
-
-let map1 = [| "##############"
-            ; "#>           #          ######"
-            ; "#            ############    #"
-            ; "#            -          +    #"
-            ; "#            ############    #"
-            ; "#            #          #    #"
-            ; "#            #          # <  #"
-            ; "##############          ######" |]
-
+        
 let charToTile char =
     match char with
     | '#' -> Tile.Wall
@@ -46,8 +41,9 @@ let charToTile char =
     | '+' -> Tile.Door(Door.Closed)
     | _ -> Tile.Floor
 
-let loadLevel mapStrs =
+let loadLevel i mapStrs =
     {
+        index = i;
         tiles = mapStrs 
             |> Seq.mapi (fun y s -> s |> Seq.mapi (fun x c -> ((x, y), (charToTile c))))
             |> Seq.collect (fun x -> x)
@@ -56,16 +52,10 @@ let loadLevel mapStrs =
 
 let levels : Level list =
     Directory.EnumerateFiles("levels", "*.txt")
+        |> Seq.sort
         |> Seq.map File.ReadAllLines
-        |> Seq.map loadLevel
+        |> Seq.mapi loadLevel
         |> List.ofSeq
-
-let locateUpStairs level =
-    level.tiles
-        |> Map.toSeq 
-        |> Seq.filter (fun (coords, tile) -> isUpStairs tile)
-        |> Seq.map fst
-        |> Seq.head
 
 [<EntryPoint>]
 let main argv = 
